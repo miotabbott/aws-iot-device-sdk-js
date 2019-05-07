@@ -20,6 +20,7 @@
 //app deps
 const thingShadow = require('..').thingShadow;
 const cmdLineProcess = require('./lib/cmdline');
+const isUndefined = require('../common/lib/is-undefined');
 
 //begin module
 
@@ -115,17 +116,25 @@ function processTest(args) {
 
    function mobileAppConnect() {
       thingShadows.register(thingName, {
-         ignoreDeltas: false,
-         operationTimeout: operationTimeout
-      });
+            ignoreDeltas: false
+         },
+         function(err, failedTopics) {
+            if (isUndefined(err) && isUndefined(failedTopics)) {
+               console.log('Mobile thing registered.');
+            }
+         });
    }
 
    function deviceConnect() {
       thingShadows.register(thingName, {
-         ignoreDeltas: true,
-         operationTimeout: operationTimeout
-      });
-      genericOperation('update', generateRandomState());
+            ignoreDeltas: true
+         },
+         function(err, failedTopics) {
+            if (isUndefined(err) && isUndefined(failedTopics)) {
+               console.log('Device thing registered.');
+               genericOperation('update', generateRandomState());
+            }
+         });
    }
 
    if (args.testMode === 1) {

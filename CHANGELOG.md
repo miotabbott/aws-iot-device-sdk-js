@@ -1,3 +1,68 @@
+## [2.2.1](https://github.com/aws/aws-iot-device-sdk-js/releases/tag/v2.2.1) (Jan 24, 2018)
+
+Bugfixes/Imporovements
+  - Upgrade MQTT.js to 2.15.1 to address security issue
+
+## [2.2.0](https://github.com/aws/aws-iot-device-sdk-js/releases/tag/v2.2.0) (Nov 29, 2017)
+
+Features
+  - Added AWS IoT Job API
+  - Added options to enable AWS IoT Custom Auth
+  - Added options to enalbe/disable AWS IoT metrics collection
+  - Added new API to support packetsend and packetreceive events
+
+Bugfixes/Imporovements
+  - Modify Keepalive defaults to 300 secs to maintain consistency across SDKs
+  - Expose shadow version from raw json object
+  - Added samples to demonstrate AWS IoT Job API
+  - Disabled MQTT.js default resubscribe. 
+
+## [2.1.0](https://github.com/aws/aws-iot-device-sdk-js/releases/tag/v2.0.1) (Sep 28, 2017)
+
+Features
+  - Update MQTT.js to 2.13.0. [MQTT.js](https://github.com/mqttjs/MQTT.js/releases/tag/v2.13.0)
+
+Bugfixes/Imporovements
+  - Propagated 'error' from 'close' event. [#131](https://github.com/aws/aws-iot-device-sdk-js/pull/131)
+  - Fixed method of handleMessage to be overridden rather than pass-through. [#129](https://github.com/aws/aws-iot-device-sdk-js/pull/129)
+  - Pass 'connack' parameter in 'connect' event  [#99](https://github.com/aws/aws-iot-device-sdk-js/pull/99)
+  - Update iot service name to 'iotdevicegateway'
+
+## [2.0.1](https://github.com/aws/aws-iot-device-sdk-js/releases/tag/v2.0.1) (Jul 2, 2017)
+
+Bugfixes/Imporovements
+  - Removed validation against .com in websocket connection.
+
+## [2.0.0](https://github.com/aws/aws-iot-device-sdk-js/releases/tag/v2.0.0) (Mar 21, 2017)
+
+API Changes
+  - Deprecated region option(-g) in device configuration.
+  - Added host endpoint option(-H) to connect to custom host endpoint 
+
+Features
+  - Added support for browserify on Windows CMD. [#74](https://github.com/aws/aws-iot-device-sdk-js/issues/74)
+  - Added support for loading IAM credentials from aws credential files.
+  - Added sample for using Node.js SDK with webpack.
+
+Bugfixes/Imporovements
+  - Fixed README.md typo [#101](https://github.com/aws/aws-iot-device-sdk-js/issues/101)
+  - Fixed thing.register() API to have independent optional parameters.[#106](https://github.com/aws/aws-iot-device-sdk-js/issues/106) 
+  - Upgrade MQTT.js to v2.2.1 and gulp dependencies. 
+  - Fixed npm test failure in node version above 4. 
+
+## [1.0.14](https://github.com/aws/aws-iot-device-sdk-js/releases/tag/v1.0.14) (Dec 7, 2016)
+
+Bugfixes/Improvements
+  - Fixes for GitHub issues [#67]( https://github.com/aws/aws-iot-device-sdk-js/issues/67), [#95](https://github.com/aws/aws-iot-device-sdk-js/issues/95), [#96](https://github.com/aws/aws-iot-device-sdk-js/issues/96).
+
+## [1.0.13](https://github.com/aws/aws-iot-device-sdk-js/releases/tag/v1.0.13) (July 11, 2016)
+
+Bugfixes/Improvements
+  - Addressed pull request[#83](https://github.com/aws/aws-iot-device-sdk-js/pull/83) Credits given to [Torsph](https://github.com/Torsph)
+  - Updated lifecycle events browser demo to read from DynamoDB table of connected clients if available
+  - Addresses pull request [#60](https://github.com/aws/aws-iot-device-sdk-js/pull/60)
+  - Fixes for GitHub issues [#66](https://github.com/aws/aws-iot-device-sdk-js/issues/66), [#61](https://github.com/aws/aws-iot-device-sdk-js/issues/61), [#53](https://github.com/aws/aws-iot-device-sdk-js/issues/53), [#48](https://github.com/aws/aws-iot-device-sdk-js/issues/48), and [#44](https://github.com/aws/aws-iot-device-sdk-js/issues/44).
+
 ## [1.0.12](https://github.com/aws/aws-iot-device-sdk-js/releases/tag/v1.0.12) (April 19, 2016)
 
 Features

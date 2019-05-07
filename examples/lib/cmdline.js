@@ -44,7 +44,6 @@ module.exports = function(description, args, processFunction, argumentHelp) {
       }
       console.log('\n' + progName + ': ' + description + '\n\n' +
          ' Options\n\n' +
-         '  -g, --aws-region=REGION          AWS IoT region\n' +
          '  -i, --client-id=ID               use ID as client ID\n' +
          '  -H, --host-name=HOST             connect to HOST (overrides --aws-region)\n' +
          '  -p, --port=PORT                  connect to PORT (overrides defaults)\n' +
@@ -52,6 +51,7 @@ module.exports = function(description, args, processFunction, argumentHelp) {
          '  -k, --private-key=FILE           use FILE as private key\n' +
          '  -c, --client-certificate=FILE    use FILE as client certificate\n' +
          '  -a, --ca-certificate=FILE        use FILE as CA certificate\n' +
+         '  -s, --code-sign-certificate=FILE use FILE as code-sign certificate\n' +
          '  -f, --certificate-dir=DIR        look in DIR for certificates\n' +
          '  -F, --configuration-file=FILE    use FILE (JSON format) for configuration\n' +
          '  -r, --reconnect-period-ms=VALUE  use VALUE as the reconnect period (ms)\n' +
@@ -61,7 +61,6 @@ module.exports = function(description, args, processFunction, argumentHelp) {
          '  -d, --delay-ms=VALUE             delay in milliseconds before publishing\n' +
          '  -D, --debug                      print additional debugging information\n\n' +
          ' Default values\n\n' +
-         '  aws-region                       us-east-1\n' +
          '  client-id                        $USER<random-integer>\n' +
          '  protocol                         mqtts\n' +
          '  private-key                      private.pem.key\n' +
@@ -75,20 +74,20 @@ module.exports = function(description, args, processFunction, argumentHelp) {
       }
    };
    args = minimist(args, {
-      string: ['certificate-dir', 'aws-region', 'private-key', 'client-certificate',
-         'ca-certificate', 'client-id', 'thing-name', 'configuration-file',
-         'host-name', 'protocol'
+      string: ['certificate-dir', 'private-key', 'client-certificate',
+         'ca-certificate', 'code-sign-certificate', 'client-id', 'thing-name',
+         'configuration-file', 'host-name', 'protocol'
       ],
       integer: ['reconnect-period-ms', 'test-mode', 'port', 'delay-ms',
          'keepalive'
       ],
       boolean: ['help', 'debug'],
       alias: {
-         region: ['g', 'aws-region'],
          clientId: ['i', 'client-id'],
          privateKey: ['k', 'private-key'],
          clientCert: ['c', 'client-certificate'],
          caCert: ['a', 'ca-certificate'],
+         csCert: ['s', 'code-sign-certificate'],
          certDir: ['f', 'certificate-dir'],
          configFile: ['F', 'configuration-file'],
          baseReconnectTimeMs: ['r', 'reconnect-period-ms'],
@@ -103,18 +102,18 @@ module.exports = function(description, args, processFunction, argumentHelp) {
          help: 'h'
       },
       default: {
-         region: 'us-east-1',
          protocol: 'mqtts',
          clientId: clientIdDefault,
          privateKey: 'private.pem.key',
          clientCert: 'certificate.pem.crt',
          caCert: 'root-CA.crt',
          testMode: 1,
+         /* milliseconds */
          baseReconnectTimeMs: 4000,
-         keepAlive: 30,
+         /* seconds */
+         keepAlive: 300,
          /* milliseconds */
          delay: 4000,
-         /* milliseconds */
          Debug: false
       },
       unknown: function() {
@@ -135,6 +134,7 @@ module.exports = function(description, args, processFunction, argumentHelp) {
       args.privateKey = args.certDir + '/' + args.privateKey;
       args.clientCert = args.certDir + '/' + args.clientCert;
       args.caCert = args.certDir + '/' + args.caCert;
+      args.csCert = args.certDir + '/' + args.csCert;
    }
    //
    // If the configuration file is defined, read it in and set the parameters based
@@ -169,11 +169,18 @@ module.exports = function(description, args, processFunction, argumentHelp) {
             args.caCert = config.caCert;
          }
       }
+      if (!isUndefined(config.csCert)) {
+         if (!isUndefined(args.certDir)) {
+            args.csCert = args.certDir + '/' + config.csCert;
+         } else {
+            args.csCert = config.csCert;
+         }
+      }
       if (!isUndefined(config.host)) {
-         args.host = config.host;
+         args.Host = config.host;
       }
       if (!isUndefined(config.port)) {
-         args.port = config.port;
+         args.Port = config.port;
       }
       //
       // When using a JSON configuration document from the AWS Console, allow

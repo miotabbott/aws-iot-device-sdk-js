@@ -59,7 +59,7 @@ describe( "thing shadow class unit tests", function() {
                certPath:'test/data/certificate.pem.crt', 
                caPath:'test/data/root-CA.crt',
                clientId:'dummy-client-1',
-               region:'us-east-1'
+               host:'XXXX.iot.us-east-1.amazonaws.com'
                }  );
 
                thingShadows.register( 'testShadow1' );
@@ -69,24 +69,136 @@ describe( "thing shadow class unit tests", function() {
       });
    });
 
+   describe( "register a thing shadow name", function() {
+//
+// Verify that the thing shadow invokes the register callback when subscription to all
+// topics are finished. The callback is invoked based on the callback from the mqtt library.
+//
+
+      var thingShadowsConfig = {
+         keyPath: 'test/data/private.pem.key',
+         certPath: 'test/data/certificate.pem.crt',
+         caPath: 'test/data/root-CA.crt',
+         clientId: 'dummy-client-1',
+         host:'XXXX.iot.us-east-1.amazonaws.com'
+      };
+
+      it("should trigger error when a subscription fails", function () {
+
+        var stubTriggerError = sinon.stub(mockMQTTClient, 'triggerError', function(){return true;});
+
+        var thingShadows = thingShadow(thingShadowsConfig);
+        thingShadows.register('testShadow1', { ignoreDeltas: true, persistentSubscribe: true }, function (err, granted) {
+          assert.notEqual(err, null);
+          for (var k = 0, grantedLen = granted.length; k < grantedLen; k++) {
+            //
+            // 128 is 0x80 - Failure from the MQTT lib.
+            //
+            assert.equal(granted[k].qos, 128);
+            stubTriggerError.restore();
+          }
+        });
+        var thisToken = thingShadows.update('testShadow1', {}); // update will fail as register is still pending
+        assert.equal(thisToken, null);
+      });
+
+      it("should trigger callback when ignoreDeltas is true and persistentSubscribe is true", function() {
+            var thingShadows = thingShadow( thingShadowsConfig );
+            var fakeCallback = sinon.spy();
+            thingShadows.register( 'testShadow1', {ignoreDeltas:true, persistentSubscribe:true}, fakeCallback);
+
+            assert(fakeCallback.calledOnce);
+      });
+
+      it("should trigger callback when ignoreDeltas is false and persistentSubscribe is false", function() {
+            var thingShadows = thingShadow( thingShadowsConfig );
+            var fakeCallback = sinon.spy();
+            thingShadows.register( 'testShadow1', {ignoreDeltas:false, persistentSubscribe:false}, fakeCallback);
+
+            assert(fakeCallback.calledOnce);
+      });
+
+      it("should trigger callback when ignoreDeltas is true and persistentSubscribe is false", function() {
+            var thingShadows = thingShadow( thingShadowsConfig );
+            var fakeCallback = sinon.spy();
+            thingShadows.register( 'testShadow1', {ignoreDeltas:true, persistentSubscribe:false}, fakeCallback);
+
+            assert(fakeCallback.calledOnce);
+      });
+
+      it("should trigger callback when ignoreDeltas is false and persistentSubscribe is true", function() {
+            var thingShadows = thingShadow( thingShadowsConfig );
+            var fakeCallback = sinon.spy();
+            thingShadows.register( 'testShadow1', {ignoreDeltas:false, persistentSubscribe:true}, fakeCallback);
+
+            assert(fakeCallback.calledOnce);
+      });
+      it("should trigger callback when shadow option is not provided", function() {
+            var thingShadows = thingShadow( thingShadowsConfig );
+            var fakeCallback = sinon.spy();
+            thingShadows.register( 'testShadow1', fakeCallback);
+
+            assert(fakeCallback.calledOnce);
+      });
+   });
+
    describe( "subscribe to/unsubscribe from a non-thing topic", function() {
 //
 // Verify that the thing shadow module does not throw an exception
 // when we subscribe to and unsubscribe from a non-thing topic.
 //
       it("does not throw an exception", function() { 
+         var fakeCallback1 = sinon.spy();
+         var fakeCallback2 = sinon.spy();
          assert.doesNotThrow( function( err ) { 
             var thingShadows = thingShadow( { 
                keyPath:'test/data/private.pem.key', 
                certPath:'test/data/certificate.pem.crt', 
                caPath:'test/data/root-CA.crt',
                clientId:'dummy-client-1',
-               region:'us-east-1'
+               host:'XXXX.iot.us-east-1.amazonaws.com'
                } );
-               thingShadows.subscribe( 'nonThingTopic1' );
-               thingShadows.unsubscribe( 'nonThingTopic1' );
+               thingShadows.subscribe('nonThingTopic1', {}, fakeCallback1);
+               thingShadows.unsubscribe('nonThingTopic1', fakeCallback2);
             }, function(err) { console.log('\t['+err+']'); return true;}
-            ); 
+         ); 
+         assert(fakeCallback1.calledOnce);
+         assert(fakeCallback2.calledOnce);
+      });
+   });
+   describe( "subscribe to/unsubscribe from a non-thing topic array", function() {
+//
+// Verify that the thing shadow module does not throw an exception
+// when we subscribe to and unsubscribe from a non-thing topic.
+//
+      it("does not throw an exception", function() { 
+         var fakeCallback1 = sinon.spy();
+         var fakeCallback2 = sinon.spy();
+         var topicArray = [];
+         assert.doesNotThrow( function( err ) { 
+            var thingShadows = thingShadow( { 
+               keyPath:'test/data/private.pem.key', 
+               certPath:'test/data/certificate.pem.crt', 
+               caPath:'test/data/root-CA.crt',
+               clientId:'dummy-client-1',
+               host:'XXXX.iot.us-east-1.amazonaws.com'
+               } );
+            var MAX_TOPIC_ARRAY_SIZE = 8;
+            for (var i = 1; i <= MAX_TOPIC_ARRAY_SIZE; i++) {
+               var topicName = 'nonThingTopic' + i;
+               topicArray.push(topicName);
+            }
+               thingShadows.subscribe(topicArray, {}, fakeCallback1);
+               thingShadows.unsubscribe(topicArray, fakeCallback2);
+            }, function(err) { console.log('\t['+err+']'); return true;}
+         ); 
+         assert(fakeCallback1.calledOnce);
+         assert(fakeCallback2.calledOnce);
+         for (var i = 0; i < topicArray.length; i++) {
+            var topicName = topicArray.shift();
+            assert.equal(mockMQTTClientObject.subscriptions.shift(), topicName);
+            assert.equal(mockMQTTClientObject.unsubscriptions.shift(), topicName);
+         }
       });
    });
 
@@ -102,7 +214,7 @@ describe( "thing shadow class unit tests", function() {
                certPath:'test/data/certificate.pem.crt', 
                caPath:'test/data/root-CA.crt',
                clientId:'dummy-client-1',
-               region:'us-east-1'
+               host:'XXXX.iot.us-east-1.amazonaws.com'
                } );
                thingShadows.publish( 'nonThingTopic1', { data: 'value' } );
             }, function(err) { console.log('\t['+err+']'); return true;}
@@ -122,9 +234,29 @@ describe( "thing shadow class unit tests", function() {
                certPath:'test/data/certificate.pem.crt', 
                caPath:'test/data/root-CA.crt',
                clientId:'dummy-client-1',
-               region:'us-east-1'
+               host:'XXXX.iot.us-east-1.amazonaws.com'
                } );
                thingShadows.subscribe( '$aws/things/nonThingTopic1' );
+            }, function(err) { console.log('\t['+err+']'); return true;}
+            ); 
+      });
+   });
+
+   describe( "subscribe to an topic array which contains an illegal non-thing topic", function() {
+//
+// Verify that the thing shadow module throws an exception if we
+// attempt to subscribe to an illegal non-thing topic.
+//
+      it("throws an exception", function() { 
+         assert.throws( function( err ) { 
+            var thingShadows = thingShadow( { 
+               keyPath:'test/data/private.pem.key', 
+               certPath:'test/data/certificate.pem.crt', 
+               caPath:'test/data/root-CA.crt',
+               clientId:'dummy-client-1',
+               host:'XXXX.iot.us-east-1.amazonaws.com'
+               } );
+               thingShadows.subscribe( ['topic1', '$aws/things/nonThingTopic1', 'topic2']);
             }, function(err) { console.log('\t['+err+']'); return true;}
             ); 
       });
@@ -142,7 +274,7 @@ describe( "thing shadow class unit tests", function() {
                certPath:'test/data/certificate.pem.crt', 
                caPath:'test/data/root-CA.crt',
                clientId:'dummy-client-1',
-               region:'us-east-1'
+               host:'XXXX.iot.us-east-1.amazonaws.com'
                } );
                thingShadows.publish( '$aws/things/nonThingTopic1', 
                                      { data: 'value' } );
@@ -163,9 +295,28 @@ describe( "thing shadow class unit tests", function() {
                certPath:'test/data/certificate.pem.crt', 
                caPath:'test/data/root-CA.crt',
                clientId:'dummy-client-1',
-               region:'us-east-1'
+               host:'XXXX.iot.us-east-1.amazonaws.com'
                } );
                thingShadows.unsubscribe( '$aws/things/nonThingTopic1' );
+            }, function(err) { console.log('\t['+err+']'); return true;}
+            ); 
+      });
+   });
+   describe( "unsubscribe from an array which contains illegal non-thing topic", function() {
+//
+// Verify that the thing shadow module throws an exception if we
+// attempt to unsubscribe from an illegal non-thing topic.
+//
+      it("throws an exception", function() { 
+         assert.throws( function( err ) { 
+            var thingShadows = thingShadow( { 
+               keyPath:'test/data/private.pem.key', 
+               certPath:'test/data/certificate.pem.crt', 
+               caPath:'test/data/root-CA.crt',
+               clientId:'dummy-client-1',
+               host:'XXXX.iot.us-east-1.amazonaws.com'
+               } );
+               thingShadows.unsubscribe( ['topic1', '$aws/things/nonThingTopic1', 'topic2'] );
             }, function(err) { console.log('\t['+err+']'); return true;}
             ); 
       });
@@ -183,7 +334,7 @@ describe( "thing shadow class unit tests", function() {
                certPath:'test/data/certificate.pem.crt', 
                caPath:'test/data/root-CA.crt',
                clientId:'dummy-client-1',
-               region:'us-east-1'
+               host:'XXXX.iot.us-east-1.amazonaws.com'
                }  );
 
                thingShadows.end( true );
@@ -207,14 +358,14 @@ describe( "thing shadow class unit tests", function() {
             certPath:'test/data/certificate.pem.crt',
             caPath:'test/data/root-CA.crt',
             clientId:'dummy-client-1',
-            region:'us-east-1'
+            host:'XXXX.iot.us-east-1.amazonaws.com'
           } );
           // Register a thing, using default delta settings
           thingShadows.register('testShadow1');
-          assert.equal(mockMQTTClientObject.commandCalled['subscribe'], 2); // Called twice, one for delta, one for GUD
+          assert.equal(mockMQTTClientObject.commandCalled['subscribe'], 1); // Called once for GUD + Delta
           mockMQTTClientObject.reInitCommandCalled();
           thingShadows.unregister('testShadow1');
-          assert.equal(mockMQTTClientObject.commandCalled['unsubscribe'], 2);
+          assert.equal(mockMQTTClientObject.commandCalled['unsubscribe'], 1);
     	});
     });
 
@@ -231,7 +382,7 @@ describe( "thing shadow class unit tests", function() {
             certPath:'test/data/certificate.pem.crt',
             caPath:'test/data/root-CA.crt',
             clientId:'dummy-client-1',
-            region:'us-east-1',
+            host:'XXXX.iot.us-east-1.amazonaws.com',
             debug: true
           } );
           // Register a thing, using default delta settings
@@ -244,7 +395,7 @@ describe( "thing shadow class unit tests", function() {
           assert.equal(mockMQTTClientObject.commandCalled['subscribe'], 1); // Called once, for GUD
           mockMQTTClientObject.reInitCommandCalled();
           thingShadows.unregister('testShadow1');
-          assert.equal(mockMQTTClientObject.commandCalled['unsubscribe'], 2); // Called twice, unsub from ALL
+          assert.equal(mockMQTTClientObject.commandCalled['unsubscribe'], 1); // Called once for all
       });
     });
 
@@ -261,7 +412,7 @@ describe( "thing shadow class unit tests", function() {
             certPath:'test/data/certificate.pem.crt',
             caPath:'test/data/root-CA.crt',
             clientId:'dummy-client-1',
-            region:'us-east-1'
+            host:'XXXX.iot.us-east-1.amazonaws.com'
           } );
 
           assert.doesNotThrow(function(err) {
@@ -285,7 +436,7 @@ describe( "thing shadow class unit tests", function() {
             certPath:'test/data/certificate.pem.crt',
             caPath:'test/data/root-CA.crt',
             clientId:'dummy-client-1',
-            region:'us-east-1'
+            host:'XXXX.iot.us-east-1.amazonaws.com'
           } );
 
           assert.doesNotThrow(function(err) {
@@ -307,7 +458,7 @@ describe( "thing shadow class unit tests", function() {
             certPath:'test/data/certificate.pem.crt',
             caPath:'test/data/root-CA.crt',
             clientId:'dummy-client-1',
-            region:'us-east-1'
+            host:'XXXX.iot.us-east-1.amazonaws.com'
           } );
           // Register a thing
           thingShadows.register('testShadow2');
@@ -338,7 +489,7 @@ describe( "thing shadow class unit tests", function() {
             certPath:'test/data/certificate.pem.crt',
             caPath:'test/data/root-CA.crt',
             clientId:'dummy-client-1',
-            region:'us-east-1',
+            host:'XXXX.iot.us-east-1.amazonaws.com',
             debug: true
           } );
           // Register a thing
@@ -370,7 +521,7 @@ describe( "thing shadow class unit tests", function() {
             certPath:'test/data/certificate.pem.crt',
             caPath:'test/data/root-CA.crt',
             clientId:'dummy-client-1',
-            region:'us-east-1'
+            host:'XXXX.iot.us-east-1.amazonaws.com'
           } );
           // Register a thing
           thingShadows.register('testShadow2');
@@ -406,7 +557,7 @@ describe( "thing shadow class unit tests", function() {
             certPath:'test/data/certificate.pem.crt',
             caPath:'test/data/root-CA.crt',
             clientId:'dummy-client-1',
-            region:'us-east-1'
+            host:'XXXX.iot.us-east-1.amazonaws.com'
           }, {  
             operationTimeout:1000 // Set operation timeout to be 1 sec
           } );
@@ -449,7 +600,7 @@ describe( "thing shadow class unit tests", function() {
             certPath:'test/data/certificate.pem.crt',
             caPath:'test/data/root-CA.crt',
             clientId:'dummy-client-1',
-            region:'us-east-1'
+            host:'XXXX.iot.us-east-1.amazonaws.com'
           }, {
             operationTimeout:1000 // Set operation timeout to be 1 sec
           } );
@@ -489,7 +640,7 @@ describe( "thing shadow class unit tests", function() {
             certPath:'test/data/certificate.pem.crt',
             caPath:'test/data/root-CA.crt',
             clientId:'dummy-client-1',
-            region:'us-east-1'
+            host:'XXXX.iot.us-east-1.amazonaws.com'
           } );
           // Register a callback
           thingShadows.on('status', fakeCallback);
@@ -531,7 +682,7 @@ describe( "thing shadow class unit tests", function() {
             certPath:'test/data/certificate.pem.crt',
             caPath:'test/data/root-CA.crt',
             clientId:'dummy-client-1',
-            region:'us-east-1'
+            host:'XXXX.iot.us-east-1.amazonaws.com'
           } );
           // Register a thing
           thingShadows.register('testShadow3', {persistentSubscribe:false}); // Unsub once there is a feedback
@@ -567,7 +718,7 @@ describe( "thing shadow class unit tests", function() {
             certPath:'test/data/certificate.pem.crt',
             caPath:'test/data/root-CA.crt',
             clientId:'dummy-client-1',
-            region:'us-east-1',
+            host:'XXXX.iot.us-east-1.amazonaws.com',
           }, {
             operationTimeout:1000 // Set operation timeout to be 1 sec
           } );
@@ -606,7 +757,7 @@ describe( "thing shadow class unit tests", function() {
             certPath:'test/data/certificate.pem.crt',
             caPath:'test/data/root-CA.crt',
             clientId:'dummy-client-1',
-            region:'us-east-1'
+            host:'XXXX.iot.us-east-1.amazonaws.com'
           } );
           // Register a callback
           thingShadows.on('status', fakeCallback);
@@ -645,7 +796,7 @@ describe( "thing shadow class unit tests", function() {
             certPath:'test/data/certificate.pem.crt',
             caPath:'test/data/root-CA.crt',
             clientId:'dummy-client-1',
-            region:'us-east-1'
+            host:'XXXX.iot.us-east-1.amazonaws.com'
           } );
           // Register a callback
           thingShadows.on('status', fakeCallback);
@@ -683,7 +834,7 @@ describe( "thing shadow class unit tests", function() {
             certPath:'test/data/certificate.pem.crt',
             caPath:'test/data/root-CA.crt',
             clientId:'dummy-client-1',
-            region:'us-east-1'
+            host:'XXXX.iot.us-east-1.amazonaws.com'
           } );
           // Register a thing
           thingShadows.register('testShadow4');
@@ -712,7 +863,7 @@ describe( "thing shadow class unit tests", function() {
             certPath:'test/data/certificate.pem.crt',
             caPath:'test/data/root-CA.crt',
             clientId:'dummy-client-1',
-            region:'us-east-1'
+            host:'XXXX.iot.us-east-1.amazonaws.com'
           } );
           // Register a thing
           thingShadows.register('testShadow4');
@@ -743,7 +894,7 @@ describe( "thing shadow class unit tests", function() {
             certPath:'test/data/certificate.pem.crt',
             caPath:'test/data/root-CA.crt',
             clientId:'dummy-client-1',
-            region:'us-east-1'
+            host:'XXXX.iot.us-east-1.amazonaws.com'
           } );
           // Register a callback
           thingShadows.on('status', fakeCallback);
@@ -784,7 +935,7 @@ describe( "thing shadow class unit tests", function() {
             certPath:'test/data/certificate.pem.crt',
             caPath:'test/data/root-CA.crt',
             clientId:'dummy-client-1',
-            region:'us-east-1'
+            host:'XXXX.iot.us-east-1.amazonaws.com'
           } );
           // Register a thing
           thingShadows.register('testShadow4', {persistentSubscribe:false}); // Unsub once there is a feedback
@@ -814,7 +965,7 @@ describe( "thing shadow class unit tests", function() {
             certPath:'test/data/certificate.pem.crt',
             caPath:'test/data/root-CA.crt',
             clientId:'dummy-client-1',
-            region:'us-east-1'
+            host:'XXXX.iot.us-east-1.amazonaws.com'
           });
           // Register a thing
           thingShadows.register('testShadow4');
@@ -828,6 +979,40 @@ describe( "thing shadow class unit tests", function() {
           assert.equal(mockMQTTClientObject.commandCalled['unsubscribe'], 0); // Never unsub
           // Unregister it
           thingShadows.unregister('testShadow4');
+      });
+    });
+
+//
+// Verify that update fails if subscriptions are not granted
+//
+    describe("Verify that update fails if subscriptions are not granted", function() {
+      it("should fail if subscriptions fail", function() {
+          // Reinit mockMQTTClientObject
+          mockMQTTClientObject.reInitCommandCalled();
+          mockMQTTClientObject.resetPublishedMessage();
+          // Init thingShadowClient
+          var thingShadows = thingShadow( {
+            keyPath:'test/data/private.pem.key',
+            certPath:'test/data/certificate.pem.crt',
+            caPath:'test/data/root-CA.crt',
+            clientId:'dummy-client-1',
+            host:'XXXX.iot.us-east-1.amazonaws.com'
+          });
+          // Register a thing
+          thingShadows.register('testShadow4', {persistentSubscribe:false});
+          // Generate fake payload
+          myPayload = '{"state":{"desired":{"color":"RED"},"reported":{"color":"BLUE"}},"clientToken":"CoolToken1"}';
+          myStateObject = JSON.parse(myPayload);
+          // cause subscribe error on update (we subscribe because we have elected to not be persistently subscribed)
+          var stubTriggerError = sinon.stub(mockMQTTClient, 'triggerError', function(){return true;});
+          // Update
+          thingShadows.update('testShadow4', myStateObject);
+          // Publish will not be called (error before updating state)
+          assert.equal(mockMQTTClientObject.commandCalled['publish'], 0);
+          // Unregister it
+          thingShadows.unregister('testShadow4');
+          // restore successful publishing
+          stubTriggerError.restore();
       });
     });
 
@@ -848,7 +1033,7 @@ describe( "thing shadow class unit tests", function() {
             certPath:'test/data/certificate.pem.crt',
             caPath:'test/data/root-CA.crt',
             clientId:'dummy-client-1',
-            region:'us-east-1'
+            host:'XXXX.iot.us-east-1.amazonaws.com'
           });
           // Register a thing
           thingShadows.register('testShadow4', {persistentSubscribe:false, enableVersioning: true}); // Unsub once there is a feedback
@@ -887,7 +1072,7 @@ describe( "thing shadow class unit tests", function() {
             certPath:'test/data/certificate.pem.crt',
             caPath:'test/data/root-CA.crt',
             clientId:'dummy-client-1',
-            region:'us-east-1',
+            host:'XXXX.iot.us-east-1.amazonaws.com',
           }, {
             operationTimeout:1000, // Set operation timeout to be 1 sec
           } );
@@ -926,7 +1111,7 @@ describe( "thing shadow class unit tests", function() {
             certPath:'test/data/certificate.pem.crt',
             caPath:'test/data/root-CA.crt',
             clientId:'dummy-client-1',
-            region:'us-east-1'
+            host:'XXXX.iot.us-east-1.amazonaws.com'
           } );
           // Register a callback
           thingShadows.on('status', fakeCallback);
@@ -966,7 +1151,7 @@ describe( "thing shadow class unit tests", function() {
             certPath:'test/data/certificate.pem.crt',
             caPath:'test/data/root-CA.crt',
             clientId:'dummy-client-1',
-            region:'us-east-1'
+            host:'XXXX.iot.us-east-1.amazonaws.com'
           }, {
             operationTimeout:1000 // Set operation timeout to be 1 sec
           } );
@@ -1016,7 +1201,7 @@ describe( "thing shadow class unit tests", function() {
             certPath:'test/data/certificate.pem.crt',
             caPath:'test/data/root-CA.crt',
             clientId:'dummy-client-1',
-            region:'us-east-1',
+            host:'XXXX.iot.us-east-1.amazonaws.com',
             debug: true
           } );
           // Register a callback
@@ -1050,7 +1235,7 @@ describe( "thing shadow class unit tests", function() {
             certPath:'test/data/certificate.pem.crt',
             caPath:'test/data/root-CA.crt',
             clientId:'dummy-client-1',
-            region:'us-east-1'
+            host:'XXXX.iot.us-east-1.amazonaws.com'
           } );
           // Register a thing
           thingShadows.register('testShadow4', { debug: true, discardStale: true, enableVersioning: true } );
@@ -1082,7 +1267,7 @@ describe( "thing shadow class unit tests", function() {
             certPath:'test/data/certificate.pem.crt',
             caPath:'test/data/root-CA.crt',
             clientId:'dummy-client-1',
-            region:'us-east-1'
+            host:'XXXX.iot.us-east-1.amazonaws.com'
           } );
           // Register a thing
           thingShadows.register('testShadow4', { debug: true, discardStale: true, enableVersioning: false } );
@@ -1114,7 +1299,7 @@ describe( "thing shadow class unit tests", function() {
             certPath:'test/data/certificate.pem.crt',
             caPath:'test/data/root-CA.crt',
             clientId:'dummy-client-1',
-            region:'us-east-1'
+            host:'XXXX.iot.us-east-1.amazonaws.com'
           } );
           // Register a thing
           thingShadows.register('testShadow4');
@@ -1143,7 +1328,7 @@ describe( "thing shadow class unit tests", function() {
             certPath:'test/data/certificate.pem.crt',
             caPath:'test/data/root-CA.crt',
             clientId:'dummy-client-1',
-            region:'us-east-1'
+            host:'XXXX.iot.us-east-1.amazonaws.com'
           } );
           // Register non-shadow callback
           thingShadows.on('message', fakeCallback);
@@ -1171,7 +1356,7 @@ describe( "thing shadow class unit tests", function() {
             certPath:'test/data/certificate.pem.crt',
             caPath:'test/data/root-CA.crt',
             clientId:'dummy-client-1',
-            region:'us-east-1'
+            host:'XXXX.iot.us-east-1.amazonaws.com'
           } );
           assert.doesNotThrow(function(err) {
             // Register 3 shadows
@@ -1212,7 +1397,7 @@ describe( "thing shadow class unit tests", function() {
             certPath:'test/data/certificate.pem.crt',
             caPath:'test/data/root-CA.crt',
             clientId:'dummy-client-1',
-            region:'us-east-1'
+            host:'XXXX.iot.us-east-1.amazonaws.com'
           } );
           // Register delta callback
           thingShadows.on('delta', distributor);
@@ -1248,7 +1433,7 @@ describe( "thing shadow class unit tests", function() {
             certPath:'test/data/certificate.pem.crt',
             caPath:'test/data/root-CA.crt',
             clientId:'dummy-client-1',
-            region:'us-east-1',
+            host:'XXXX.iot.us-east-1.amazonaws.com',
             debug:true
           } );
           clientToken = thingShadows.get('UnknownThing1');
@@ -1272,7 +1457,7 @@ describe( "thing shadow class unit tests", function() {
             certPath:'test/data/certificate.pem.crt',
             caPath:'test/data/root-CA.crt',
             clientId:'dummy-client-1',
-            region:'us-east-1'
+            host:'XXXX.iot.us-east-1.amazonaws.com'
           } );
           // Register a thing
           thingShadows.register('testShadow3');
@@ -1318,7 +1503,7 @@ describe( "thing shadow class unit tests", function() {
             certPath:'test/data/certificate.pem.crt',
             caPath:'test/data/root-CA.crt',
             clientId:'dummy-client-1',
-            region:'us-east-1'
+            host:'XXXX.iot.us-east-1.amazonaws.com'
           } );
           // Register fake callbacks
           thingShadows.on('status', fakeCallback);
@@ -1331,13 +1516,13 @@ describe( "thing shadow class unit tests", function() {
           sinon.assert.calledOnce(fakeCallback2); // Should be triggered
           assert.equal(fakeCallback2.getCalls()[0].args[0],'testShadow3');
           assert.equal(fakeCallback2.getCalls()[0].args[1],'update');
-          assert.deepEqual(fakeCallback2.getCalls()[0].args[2],{stateVar:'value111'});
+          assert.deepEqual(fakeCallback2.getCalls()[0].args[2],{stateVar:'value111', version:2});
           mockMQTTClientObject.emit('message', '$aws/things/testShadow3/shadow/delete/accepted', '{ "version":1, "timestamp":1456254966, "clientToken": "unknownClienToken" }');
           sinon.assert.notCalled(fakeCallback);   // Should never trigger the callback
           sinon.assert.calledTwice(fakeCallback2); // Should be triggered
           assert.equal(fakeCallback2.getCalls()[1].args[0],'testShadow3');
           assert.equal(fakeCallback2.getCalls()[1].args[1],'delete');
-          assert.deepEqual(fakeCallback2.getCalls()[1].args[2],{'timestamp':1456254966});
+          assert.deepEqual(fakeCallback2.getCalls()[1].args[2],{'timestamp':1456254966, version:1});
           mockMQTTClientObject.emit('message', '$aws/things/testShadow3/shadow/get/accepted', '{ "state": { "desired": { "value": 1 }}, "version":1, "timestamp":1456254966, "clientToken": "unknownClienToken" }');
           sinon.assert.notCalled(fakeCallback);   // Should never trigger the callback
           sinon.assert.calledTwice(fakeCallback2); // Should never trigger the callback
@@ -1365,7 +1550,7 @@ describe( "thing shadow class unit tests", function() {
             certPath:'test/data/certificate.pem.crt',
             caPath:'test/data/root-CA.crt',
             clientId:'dummy-client-1',
-            region:'us-east-1',
+            host:'XXXX.iot.us-east-1.amazonaws.com',
             operationTimeout: operationTimeout
           } );
           // Register a fake callback
